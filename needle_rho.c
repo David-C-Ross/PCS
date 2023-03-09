@@ -1,15 +1,14 @@
-#include <gmp.h>
 #include <stdio.h>
-#include <time.h>
-#include <math.h>
+#include <stdlib.h>
 #include "needle_rho.h"
+#include "pcg_basic.h"
 #include "random_functions.h"
 
-static uint8_t nb_bits;
-static uint8_t prob;
-static mpz_t inner_flavor;
-static mpz_t outer_flavor;
-static gmp_randstate_t r_state;
+static uint32_t search_space;
+static uint32_t prob;
+
+static uint32_t inner_flavor;
+static uint32_t outer_flavor;
 
 /** Determines whether a point is our needle.
  *
@@ -17,128 +16,116 @@ static gmp_randstate_t r_state;
  *  @param[in]	inverse_prob		1 / probability of needle.
  *  @return 	1 if one of the points is the needle, 0 otherwise.
  **/
-int isNeedle(mpz_t collision, int inverse_prob) {
+int isNeedle(uint32_t collision, uint32_t inverse_prob) {
 
-    int retval = 0, counter = 0;
+    uint8_t retval = 0, counter = 0;
 
-    mpz_t x, zero;
-    mpz_inits(x, zero, NULL);
+    uint32_t x;
+
+    pcg32_random_t rng;
+    pcg32_srandom_r(&rng, arc4random(), arc4random());
 
     for (int i = 0; i < inverse_prob; ++i) {
-        mpz_urandomb(x, r_state, nb_bits);
-        f(x, zero);
-        if (mpz_cmp(collision, x) == 0) {
+        x = pcg32_boundedrand_r(&rng, search_space);
+        x = f(x, 0);
+        if (collision == x) {
             counter++;
         }
     }
     if (counter >= 2) {
-        printf("%lu is the needle!", mpz_get_ui(collision));
+        printf("%u is the needle!", collision);
         retval =  1;
     }
-    mpz_clears(x, zero, NULL);
     return retval;
 }
 
-void rhoModeDetection(uint8_t n, uint8_t prob_init) {
+void rhoModeDetection(uint8_t nb_bits, uint8_t prob_init) {
 
-    nb_bits = n;
-    prob = prob_init;
-    int inverse_prob = pow(2, prob);
-    int counter = 0;
+    search_space = 1 << nb_bits;
+    prob = 1 << prob_init;
 
-    mpz_t start, collision;
-    mpz_inits(start, collision, inner_flavor, outer_flavor, NULL);
+    uint32_t start, collision;
 
-    gmp_randinit_default(r_state);
-    gmp_randseed_ui(r_state, time(NULL));
+    pcg32_random_t rng;
+    pcg32_srandom_r(&rng, arc4random(), arc4random());
 
     initF(nb_bits, prob);
 
     do {
-        counter++;
-        mpz_urandomb(start, r_state, nb_bits);
-        mpz_urandomb(outer_flavor, r_state, nb_bits);
+        start = pcg32_boundedrand_r(&rng, search_space);
+        outer_flavor = pcg32_boundedrand_r(&rng, search_space);
 
-        nestedRho(start, collision);
+        collision = nestedRho(start);
 
-        printf("%d: findCollision found!, %lu \n", counter, mpz_get_ui(collision));
+        printf("collision found!, %u \n", collision);
         printf("________________________________ \n");
     }
-    while (!isNeedle(collision, inverse_prob));
-
-    mpz_clears(start, collision, inner_flavor, outer_flavor, NULL);
-    gmp_randclear(r_state);
+    while (!isNeedle(collision, prob));
 }
 
-void nestedRho(mpz_t start_point, mpz_t collision) {
+uint32_t nestedRho(uint32_t start) {
 
-    mpz_t tortoise, hare;
-    mpz_inits(tortoise, hare, NULL);
+    uint32_t tortoise, hare;
 
-    mpz_xor(tortoise, start_point, outer_flavor);
-    mpz_set(inner_flavor, tortoise);
-    rho(tortoise, inner_flavor, tortoise);
+    tortoise = start ^ outer_flavor;
+    inner_flavor =  tortoise;
+    tortoise = rho(tortoise, inner_flavor);
 
-    mpz_xor(hare, tortoise, outer_flavor);
-    mpz_set(inner_flavor, hare);
-    rho(hare, inner_flavor, hare);
+    hare = tortoise ^ outer_flavor;
+    inner_flavor = hare;
+    hare = rho(hare, inner_flavor);
 
-    while (mpz_cmp(tortoise, hare) != 0) {
-        mpz_xor(tortoise, tortoise, outer_flavor);
-        mpz_set(inner_flavor, tortoise);
-        rho(tortoise, inner_flavor, tortoise);
-        //printf("tortoise!, %lu \n", mpz_get_ui(tortoise));
+    while (tortoise != hare) {
+        tortoise = tortoise ^ outer_flavor;
+        inner_flavor =  tortoise;
+        tortoise = rho(tortoise, inner_flavor);
+        //printf("tortoise!, %u \n", tortoise);
 
-        mpz_xor(hare, hare, outer_flavor);
-        mpz_set(inner_flavor, hare);
-        rho(hare, inner_flavor, hare);
-        //printf("hare!, %lu \n", mpz_get_ui(hare));
-        mpz_xor(hare, hare, outer_flavor);
-        mpz_set(inner_flavor, hare);
-        rho(hare, inner_flavor, hare);
-        //printf("hare!, %lu \n", mpz_get_ui(hare));
+        hare = hare ^ outer_flavor;
+        inner_flavor = hare;
+        hare = rho(hare, inner_flavor);
+        //printf("hare!, %lu \n", hare);
+        hare = hare ^ outer_flavor;
+        inner_flavor = hare;
+        hare = rho(hare, inner_flavor);
+        //printf("hare!, %lu \n", hare);
     }
 
-    mpz_set(tortoise, start_point);
-    while (mpz_cmp(tortoise, hare) != 0) {
-        mpz_xor(tortoise, tortoise, outer_flavor);
-        mpz_set(inner_flavor, tortoise);
-        rho(tortoise, inner_flavor, tortoise);
+    tortoise = start;
+    while (tortoise != hare) {
+        tortoise = tortoise ^ outer_flavor;
+        inner_flavor =  tortoise;
+        tortoise = rho(tortoise, inner_flavor);
 
-        mpz_xor(hare, hare, outer_flavor);
-        mpz_set(inner_flavor, hare);
-        rho(hare, inner_flavor, hare);
+        hare = hare ^ outer_flavor;
+        inner_flavor = hare;
+        hare = rho(hare, inner_flavor);
     }
-    mpz_set(collision, tortoise);
-    mpz_clears(tortoise, hare, NULL);
+    return tortoise;
 }
 
-void rho(mpz_t start_point, mpz_t flavor, mpz_t collision) {
+uint32_t rho(uint32_t start, uint32_t flavor) {
 
-    mpz_t t, h;
-    mpz_inits(t, h, NULL);
+    uint32_t t, h;
 
-    mpz_set(t, start_point);
-    f(t, flavor);
+    t = start;
+    t = f(t, flavor);
 
-    mpz_set(h, start_point);
-    f(h, flavor);
-    f(h, flavor);
+    h = start;
+    h = f(h, flavor);
+    h = f(h, flavor);
 
-    while (mpz_cmp(t, h) != 0) {
-        f(t, flavor);
+    while (t != h) {
+        t = f(t, flavor);
 
-        f(h, flavor);
-        f(h, flavor);
+        h = f(h, flavor);
+        h = f(h, flavor);
     }
 
-    mpz_set(t, start_point);
-    while (mpz_cmp(t, h) != 0) {
-        f(t, flavor);
-        f(h, flavor);
+    t = start;
+    while (t != h) {
+        t = f(t, flavor);
+        h = f(h, flavor);
     }
-    mpz_set(collision, t);
-    //printf("collision!, %lu \n", mpz_get_ui(findCollision));
-
-    mpz_clears(t, h, NULL);
+    return t;
 }

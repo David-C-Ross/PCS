@@ -1,113 +1,122 @@
-#include <gmp.h>
-#include <math.h>
-#include <time.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include "pcs.h"
-#include "needle_pcs.h"
-#include "random_functions.h"
 #include "pcs_storage.h"
+#include "needle_pcs.h"
 #include "needle_rho.h"
+#include "random_functions.h"
 
-static uint8_t nb_bits;
-static uint8_t memory;
+static uint32_t search_space;
+static uint32_t prob;
+
+static uint32_t inner_flavor;
+static uint32_t outer_flavor;
+
 static uint8_t trailing_bits;
 
-static mpz_t inner_flavor;
-static mpz_t outer_flavor;
 
-static gmp_randstate_t r_state;
-static gmp_randstate_t r_state_pcs1;
-static gmp_randstate_t r_state_pcs2;
-
-uint8_t trailingBitsInit() {
+uint8_t trailingBitsInit(uint8_t nb_bits, uint8_t memory) {
     uint8_t bits = nb_bits - memory;
     return bits / 2;
 }
 
-int collisionPcs(mpz_t distCollision, mpz_t a1, mpz_t a2, int length1, int length2) {
+uint32_t collisionPcs(Tuple_t *tuple1, Tuple_t *tuple2, uint8_t memory) {
 
-    mpz_t b1, b2;
-    mpz_inits(b1, b2, NULL);
+    uint8_t flag;
 
-    mpz_set(b1, a1);
-    mpz_set(b2, a2);
+    uint32_t x1, x2;
+    uint32_t len1, len2;
 
-    int retval = 0;
+    x1 = tuple1->start;
+    x2 = tuple2->start;
 
-    Table_t *inner_table1 = struct_init(memory);
-    Table_t *inner_table2 = struct_init(memory);
+    len1 = tuple1->length;
+    len2 = tuple2->length;
 
-    gmp_randseed(r_state_pcs1, a1);
-    gmp_randseed(r_state_pcs2, a2);
+    Table_t *inner_table1 = structInit(memory);
+    Table_t *inner_table2 = structInit(memory);
 
-    while (length1 > length2) {
-        pcsRun(inner_table1, outer_flavor, 1, r_state_pcs1, &b1);
-        length1--;
+    pcg32_random_t int_rng1, int_rng2;
+    pcg32_srandom_r(&int_rng1, tuple1->start ^ inner_flavor,
+                    tuple1->start ^ outer_flavor);
+    pcg32_srandom_r(&int_rng2, tuple2->start ^ inner_flavor,
+                    tuple2->start ^ outer_flavor);
+
+    while (len1 > len2) {
+        pcsRun(inner_table1, outer_flavor, 1, &int_rng1, &x1);
+        len1--;
     }
-    while (length2 > length1) {
-        pcsRun(inner_table1, outer_flavor, 1, r_state_pcs2, &b2);
-        length2--;
+    while (len2 > len1) {
+        pcsRun(inner_table2, outer_flavor, 1, &int_rng2, &x2);
+        len2--;
     }
-    if (mpz_cmp(b1, b2) != 0) {
-        while (mpz_cmp(b1, b2) != 0) {
-            pcsRun(inner_table1, outer_flavor, 1, r_state_pcs1, &b1);
+    if (x1 == x2) {
+        flag = 0;
+    } else {
+        while (x1 != x2) {
+            pcsRun(inner_table1, outer_flavor, 1, &int_rng1, &x1);
 
-            pcsRun(inner_table1, outer_flavor, 1, r_state_pcs2, &b2);
+            pcsRun(inner_table2, outer_flavor, 1, &int_rng2, &x2);
         }
-        mpz_set(distCollision, b1);
-        retval = 1;
+        flag = 1;
     }
     structFree(inner_table1);
     structFree(inner_table2);
 
-    return retval;
+    if (flag) {
+        return x1;
+    } else {
+        return 0;
+    }
 }
 
-int collisionRho(mpz_t distCollision, mpz_t a1, mpz_t a2, int length1, int length2) {
+uint32_t collisionRho(Tuple_t *tuple1, Tuple_t *tuple2) {
 
-    mpz_t b1, b2;
-    mpz_inits(b1, b2, NULL);
+    uint8_t flag;
 
-    mpz_set(b1, a1);
-    mpz_set(b2, a2);
+    uint32_t x1, x2;
+    uint32_t len1, len2;
 
-    int retval = 0;
+    x1 = tuple1->start;
+    x2 = tuple2->start;
 
-    while (length1 > length2) {
-        mpz_xor(b1, b1, outer_flavor);
-        mpz_set(inner_flavor, b1);
-        rho(b1, inner_flavor, b1);
-        length1--;
+    len1 = tuple1->length;
+    len2 = tuple2->length;
+
+    while (len1 > len2) {
+        x1 = x1 ^ outer_flavor;
+        inner_flavor = x1;
+        x1 = rho(x1, inner_flavor);
+        len1--;
     }
-    while (length2 > length1) {
-        mpz_xor(b2, b2, outer_flavor);
-        mpz_set(inner_flavor, b2);
-        rho(b2, inner_flavor, b2);
-        length2--;
+    while (len2 > len1) {
+        x2 = x2 ^ outer_flavor;
+        inner_flavor = x2;
+        x2 = rho(x2, inner_flavor);
+        len2--;
     }
     // checks for robin hood
-    if (mpz_cmp(b1, b2) != 0) {
-        while (mpz_cmp(b1, b2) != 0) {
+    if (x1 == x2) {
+        flag = 0;
+    } else {
+        while (x1 != x2) {
+            x1 = x1 ^ outer_flavor;
+            inner_flavor = x1;
+            x1 = rho(x1, inner_flavor);
 
-            mpz_xor(b1, b1, outer_flavor);
-            mpz_set(inner_flavor, b1);
-            rho(b1, inner_flavor, b1);
-
-            mpz_xor(b2, b2, outer_flavor);
-            mpz_set(inner_flavor, b2);
-            rho(b2, inner_flavor, b2);
+            x2 = x2 ^ outer_flavor;
+            inner_flavor = x2;
+            x2 = rho(x2, inner_flavor);
         }
-        mpz_set(distCollision, b1);
-        retval = 1;
+        flag = 1;
     }
-    mpz_clears(b1, b2, NULL);
-
-    return retval;
+    if (flag) {
+        return x1;
+    } else {
+        return 0;
+    }
 }
-
 
 /** Determines whether a point is our needle.
  *
@@ -116,27 +125,30 @@ int collisionRho(mpz_t distCollision, mpz_t a1, mpz_t a2, int length1, int lengt
  *  @param[in]	nb_collisions	number of possible needles to check.
  *  @return 	1 if one of the points is the needle, 0 otherwise.
  **/
-int isNeedleMem(mpz_t *collisions, int inverse_prob, int nb_collisions) {
-    int retval = 0;
-    int *counters = calloc(nb_collisions, sizeof(int));
+int isNeedleMem(uint32_t *collisions, uint32_t inverse_prob, uint32_t nb_collisions) {
 
-    mpz_t x, zero;
-    mpz_inits(x, zero, NULL);
+    uint8_t retval = 0;
+    uint8_t *counters = calloc(nb_collisions, sizeof(uint8_t));
 
-    for (int i = 0; i < 3 * inverse_prob; ++i) {
-        mpz_urandomb(x, r_state, nb_bits);
-        f(x, zero);
+    uint32_t x;
+
+    pcg32_random_t rng;
+    pcg32_srandom_r(&rng, arc4random(), arc4random());
+
+    for (uint32_t i = 0; i < 7 * inverse_prob; ++i) {
+        x = pcg32_boundedrand_r(&rng, search_space);
+        x = f(x, 0);
         for (int j = 0; j < nb_collisions; ++j) {
-            if (mpz_cmp(collisions[j], x) == 0) {
+            if (collisions[j] == x) {
                 counters[j]++;
-                if (counters[j] >= 2) {
-                    if (mpz_cmp_ui(collisions[j], 1) == 0) {
+                if (counters[j] >= 6) {
+                    if (x == 1) {
                         retval = 1;
                     }
                     else {
                         retval = -1;
                     }
-                    printf("%lu is the needle!", mpz_get_ui(collisions[j]));
+                    printf("%u is the needle!", collisions[j]);
                     goto end;
                 }
             }
@@ -144,41 +156,37 @@ int isNeedleMem(mpz_t *collisions, int inverse_prob, int nb_collisions) {
     }
     end:
     free(counters);
-    mpz_clears(x, zero, NULL);
 
     return retval;
 }
 
-int pcsPcsModeDetection(uint8_t n, uint8_t memory_init, uint8_t prob_init) {
+uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
-    nb_bits = n;
-    memory = memory_init;
-    trailing_bits = trailingBitsInit();
+    search_space = 1 << nb_bits;
+    prob = 1 << prob_init;
 
-    int nb_collisions = (int) pow(2, memory);
-    int inverse_prob = (int) pow(2, prob_init);
-    char xDist_str[50];
+    trailing_bits = trailingBitsInit(nb_bits, memory);
 
-    int trail_length1, trail_length2;
-    int trail_length_max = (int) pow(2, trailing_bits) * 15;
-    int counter, flag;
+    uint32_t collision, nb_collisions = 1 << memory;
+    uint32_t *collisions = malloc(sizeof(uint32_t) * nb_collisions);
+
+    uint32_t trail_length;
+    uint32_t trail_length_max = (1 << trailing_bits) * 15;
+
+    uint64_t start;
+
+    uint8_t counter, flag;
 
     Table_t *inner_table;
     Table_t *outer_table;
 
-    mpz_t *collisions = malloc(sizeof(mpz_t) * nb_collisions);
-    for (int i = 0; i < nb_collisions; ++i) {
-        mpz_init(collisions[i]);
-    }
+    Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
+    Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
-    mpz_t start1, start2, collision, distCollision;
-    mpz_inits(start1, start2, collision, distCollision, outer_flavor, NULL);
+    pcg32_random_t ext_rng;
+    pcg32_srandom_r(&ext_rng, arc4random(), arc4random());
 
-    gmp_randinit_default(r_state);
-    gmp_randseed_ui(r_state, time(NULL));
-
-    gmp_randinit_default(r_state_pcs1);
-    gmp_randinit_default(r_state_pcs2);
+    pcg32_random_t int_rng;
 
     initF(nb_bits, prob_init);
     pcsInit(nb_bits, trailing_bits);
@@ -186,94 +194,90 @@ int pcsPcsModeDetection(uint8_t n, uint8_t memory_init, uint8_t prob_init) {
     do {
         counter = 0;
 
-        outer_table = structInitHash(memory);
+        outer_table = structInit(memory);
+        // create random inner_flavor
+        inner_flavor = pcg32_random_r(&ext_rng);
         // create random outer_flavor
-        mpz_urandomb(outer_flavor, r_state, nb_bits);
+        outer_flavor = pcg32_boundedrand_r(&ext_rng, search_space);
         // find O(M) collisions which are also distinguished points
         for (int i = 0; i < nb_collisions; ++i) {
 
-            mpz_urandomb(start1, r_state, nb_bits);
-            gmp_randseed(r_state_pcs1, start1);
+            start = pcg32_random_r(&ext_rng);
+            pcg32_srandom_r(&int_rng, start ^ inner_flavor,
+                            start ^ outer_flavor);
 
-            trail_length1 = 0;
-            inner_table = struct_init(memory);
+            trail_length = 0;
+            inner_table = structInit(memory);
 
             do {
-                pcsRun(inner_table, outer_flavor, 1, r_state_pcs1, &collision);
-                //printf("collision found!, %lu \n", mpz_get_ui(collision));
-                trail_length1++;
+                pcsRun(inner_table, outer_flavor, 1, &int_rng, &collision);
+                //printf("collision found!, %u \n", collision);
+                trail_length++;
 
-                if (trail_length1 > trail_length_max) {
-                    mpz_urandomb(start1, r_state, nb_bits);
-                    gmp_randseed(r_state_pcs1, start1);
+                if (trail_length > trail_length_max) {
+                    start = pcg32_random_r(&ext_rng);
+                    pcg32_srandom_r(&int_rng, start ^ inner_flavor,
+                                    start ^outer_flavor);
 
-                    trail_length1 = 0;
+                    trail_length = 0;
                     structFree(inner_table);
-                    inner_table = struct_init(memory);
+                    inner_table = structInit(memory);
                 }
             } while (!isDistinguished(collision));
 
-            //printf("distinguished collision found!, %lu \n", mpz_get_ui(collision));
+            tuple1->key = collision;
+            tuple1->start = start;
+            tuple1->length = trail_length;
+            //printf("distinguished collision found!, %u \n", collision);
             structFree(inner_table);
 
-            trail_length2 = structAdd(outer_table, start2, start1, collision, trail_length1, xDist_str);
-            if (trail_length2) {
-                if (collisionPcs(distCollision, start1, start2, trail_length1, trail_length2)) {
-                    printf("repeated findCollision!, %lu \n", mpz_get_ui(distCollision));
-                    mpz_set(collisions[counter], distCollision);
+            if (structAdd(outer_table, tuple1, tuple2)) {
+                collision = collisionPcs(tuple1, tuple2, memory);
+                if (collision) {
+                    //printf("repeated collision!, %u \n", collision);
+                    collisions[counter] = collision;
                     counter++;
                 }
             }
         }
-        flag = isNeedleMem(collisions, inverse_prob, counter);
+        structFree(outer_table);
+        flag = isNeedleMem(collisions, prob, counter);
         if (flag) goto found_needle;
 
-        structFree(outer_table);
-        printf("________________________________ \n");
+        //printf("________________________________ \n");
     } while (1);
 
     found_needle:
-    for (int i = 0; i < nb_collisions; ++i) {
-        mpz_clear(collisions[i]);
-    }
+
     free(collisions);
-
-    mpz_clears(start1, start2, collision, distCollision, outer_flavor, NULL);
-    gmp_randclear(r_state);
-    gmp_randclear(r_state_pcs1);
-    gmp_randclear(r_state_pcs2);
-
-    structFree(outer_table);
+    free(tuple1);
+    free(tuple2);
 
     return flag;
 }
 
-int pcsRhoModeDetection(uint8_t n, uint8_t memory_init, uint8_t prob_init) {
+uint8_t pcsRhoModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
-    nb_bits = n;
-    memory = memory_init;
-    trailing_bits = trailingBitsInit();
+    search_space = 1 << nb_bits;
+    prob = 1 << prob_init;
 
-    int nb_collisions = (int) pow(2, memory);
-    int inverse_prob = (int) pow(2, prob_init);
-    char xDist_str[50];
+    trailing_bits = trailingBitsInit(nb_bits, memory);
 
-    int trail_length1, trail_length2;
-    int trail_length_max = (int) pow(2, trailing_bits) * 13;
-    int counter, flag;
+    uint32_t start, collision, nb_collisions = 1 << memory;
+    uint32_t *collisions = malloc(sizeof(uint32_t) * nb_collisions);
+
+    uint32_t trail_length;
+    uint32_t trail_length_max = (1 << trailing_bits) * 15;
+
+    uint8_t counter, flag;
 
     Table_t *outer_table;
 
-    mpz_t *collisions = malloc(sizeof(mpz_t) * nb_collisions);
-    for (int i = 0; i < nb_collisions; ++i) {
-        mpz_init(collisions[i]);
-    }
+    Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
+    Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
-    mpz_t start1, start2, collision, distCollision;
-    mpz_inits(start1, start2, collision, distCollision, inner_flavor, outer_flavor, NULL);
-
-    gmp_randinit_default(r_state);
-    gmp_randseed_ui(r_state, time(NULL));
+    pcg32_random_t ext_rng;
+    pcg32_srandom_r(&ext_rng, arc4random(), arc4random());
 
     initF(nb_bits, prob_init);
     pcsInit(nb_bits, trailing_bits);
@@ -281,61 +285,98 @@ int pcsRhoModeDetection(uint8_t n, uint8_t memory_init, uint8_t prob_init) {
     do {
         counter = 0;
 
-        outer_table = structInitHash(memory);
+        outer_table = structInit(memory);
         // create random outer_flavor
-        mpz_urandomb(outer_flavor, r_state, nb_bits);
-
+        outer_flavor = pcg32_boundedrand_r(&ext_rng, search_space);
+        // find O(M) collisions which are also distinguished points
         for (int i = 0; i < nb_collisions; ++i) {
 
-            mpz_urandomb(start1, r_state, nb_bits);
-            mpz_set(collision, start1);
+            start = pcg32_boundedrand_r(&ext_rng, search_space);
+            collision = start;
+            trail_length = 0;
 
-            trail_length1 = 0;
             do {
-                mpz_xor(collision, collision, outer_flavor);
-                mpz_set(inner_flavor, collision);
-                rho(collision, inner_flavor, collision);
-                trail_length1++;
+                collision =  collision ^ outer_flavor;
+                inner_flavor = collision;
+                collision = rho(collision, inner_flavor);
+                trail_length++;
 
-                //printf("collision found!, %lu \n", mpz_get_ui(collision));
+                //printf("collision found!, %u \n", collision);
 
-                if (trail_length1 > trail_length_max) {
-                    mpz_urandomb(start1, r_state, nb_bits);
-                    mpz_set(collision, start1);
-                    trail_length1 = 0;
+                if (trail_length > trail_length_max) {
+                    start = pcg32_boundedrand_r(&ext_rng, search_space);
+                    collision = start;
+                    trail_length = 0;
                 }
 
             } while (!isDistinguished(collision));
 
-            //printf("distinguished collision found!, %lu \n", mpz_get_ui(collision));
+            tuple1->key = collision;
+            tuple1->start = start;
+            tuple1->length = trail_length;
+            //printf("distinguished collision found!, %u \n", collision);
 
-            trail_length2 = structAdd(outer_table, start2, start1, collision, trail_length1, xDist_str);
-            if (trail_length2) {
-                if (collisionRho(distCollision, start1, start2, trail_length1, trail_length2)) {
-                    printf("repeated findCollision!, %lu \n", mpz_get_ui(distCollision));
-                    mpz_set(collisions[counter], distCollision);
+            if (structAdd(outer_table, tuple1, tuple2)) {
+                collision = collisionRho(tuple1, tuple2);
+                if (collision) {
+                    //printf("repeated collision!, %u \n", collision);
+                    collisions[counter] = collision;
                     counter++;
                 }
             }
         }
-        flag = isNeedleMem(collisions, inverse_prob, counter);
+        structFree(outer_table);
+        flag = isNeedleMem(collisions, prob, counter);
         if (flag) goto found_needle;
 
-        structFree(outer_table);
-        printf("________________________________ \n");
+        //printf("________________________________ \n");
     } while (1);
 
     found_needle:
-    for (int i = 0; i < nb_collisions; ++i) {
-        mpz_clear(collisions[i]);
-    }
+
     free(collisions);
-
-
-    mpz_clears(start1, start2, collision, distCollision, inner_flavor, outer_flavor, NULL);
-    gmp_randclear(r_state);
-
-    structFree(outer_table);
+    free(tuple1);
+    free(tuple2);
 
     return flag;
 }
+
+uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
+
+    search_space = 1 << nb_bits;
+    prob = 1 << prob_init;
+
+    trailing_bits = trailingBitsInit(nb_bits, memory);
+
+    uint32_t nb_collisions = 1 << memory;
+    uint32_t *collisions = malloc(sizeof(uint32_t) * nb_collisions);
+
+    uint8_t flag;
+
+    pcg32_random_t rng;
+
+    Table_t *outer_table;
+
+    initF(nb_bits, prob_init);
+    pcsInit(nb_bits, trailing_bits);
+
+    do {
+        outer_table = structInit(memory);
+
+        pcg32_srandom_r(&rng, arc4random(), arc4random());
+        outer_flavor = pcg32_boundedrand_r(&rng, search_space);
+
+        pcsRun(outer_table, outer_flavor, nb_collisions, &rng, collisions);
+
+        structFree(outer_table);
+
+        flag = isNeedleMem(collisions, prob, nb_collisions);
+        if (flag) goto found_needle;
+    } while (1);
+
+    found_needle:
+
+    free(collisions);
+    return flag;
+}
+

@@ -1,11 +1,7 @@
-#include <stdlib.h> /* exit */
 #include <inttypes.h>
-#include <gmp.h>
-#include <time.h>
 
-static uint8_t nb_bits;
-static uint8_t prob;
-static uint32_t table_size;
+static uint32_t search_space;
+static uint32_t prob;
 
 uint32_t jenkins(uint32_t a)
 {
@@ -33,28 +29,22 @@ uint32_t hashInt(uint32_t a)
  *
  * 	@param[in]	point	    Current point.
  */
-void f(mpz_t point, mpz_t flavor) {
+uint32_t f(uint32_t point, uint32_t flavor) {
 
-    mpz_t temp;
-    mpz_xor(point, point, flavor);
+    point = point ^ flavor;
 
-    uint32_t p = mpz_get_ui(point);
-    uint32_t j = jenkins(p);
-    uint32_t i = hashInt(j);
-    mpz_init_set_ui(temp, j);
+    uint32_t i = hashInt(point);
+    uint32_t j = jenkins(point);
 
-    if (mpz_divisible_2exp_p(temp, prob)) {
-        mpz_set_ui(point, 1);
+    if (i % prob == 0) {
+        return 1;
     } else {
-        i = i & (table_size - 1);
-        mpz_set_ui(point, i);
-        //mpz_fdiv_r_2exp(point, temp, nb_bits);
+        j = j & (search_space - 1);
+        return j;
     }
-    mpz_clear(temp);
 }
 
-void initF(uint8_t n_init, uint8_t prob_init) {
-    nb_bits = n_init;
-    prob = prob_init;
-    table_size = 1 << nb_bits;
+void initF(uint8_t nb_bits, uint8_t prob_init) {
+    search_space = 1 << nb_bits;
+    prob = 1 << prob_init;
 }

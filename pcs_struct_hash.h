@@ -4,23 +4,23 @@
 #include <gmp.h>
 #include <inttypes.h>
 
-typedef struct hashUNIX
+typedef struct Tuple
 {
-    char *key;
-    char *start;
-    int length;
+    uint32_t key;
+    uint32_t start;
+    uint32_t length;
 
-}hashUNIX_t;
+}Tuple_t;
 
 typedef struct Table
 {
-    hashUNIX_t ** array;
-    unsigned int memory_alloc;
+    Tuple_t ** array;
+    uint32_t memory_alloc;
 
 }Table_t;
 
 Table_t *structInitHash(uint8_t memory);
-int structAddHash(Table_t *table, mpz_t a_out, mpz_t a_in, int length, char xDist[]);
+uint8_t structAddHash(Table_t *table, Tuple_t *tuple1, Tuple_t *tuple2);
 void structFreeHash(Table_t *table);
 
 #endif
