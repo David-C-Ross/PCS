@@ -31,6 +31,7 @@ uint32_t hashInt(uint32_t a)
  */
 uint32_t f(uint32_t point, uint32_t flavor) {
 
+    // the flavor of f
     point = point ^ flavor;
 
     uint32_t i = hashInt(point);
@@ -47,4 +48,9 @@ uint32_t f(uint32_t point, uint32_t flavor) {
 void initF(uint8_t nb_bits, uint8_t prob_init) {
     search_space = 1 << nb_bits;
     prob = 1 << prob_init;
+}
+
+uint8_t trailingBitsInit(uint8_t nb_bits, uint8_t memory) {
+    uint8_t bits = nb_bits - memory;
+    return bits / 2;
 }

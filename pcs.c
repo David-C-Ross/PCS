@@ -29,14 +29,15 @@ void getDistinguished(uint32_t start, pcg32_random_t* rngptr, Tuple_t *tuple) {
 
     uint32_t x = start;
     uint32_t trail_length = 0;
-    uint32_t trail_length_max = trailing_space * 15;
+    uint32_t trail_length_max = trailing_space * 20;
 
     while (!isDistinguished(x)) {
         x = f(x, flavor);
         trail_length++;
 
         if (trail_length > trail_length_max) {
-            start = pcg32_boundedrand_r(rngptr, search_space);
+            // start = pcg32_boundedrand_r(rngptr, search_space);
+            start = hashInt(start) % search_space;
 
             x = start;
             trail_length = 0;
@@ -92,40 +93,42 @@ uint32_t findCollision(Tuple_t *tuple1, Tuple_t *tuple2) {
 /** Initialize all variables needed to do a PCS algorithm.
  *
  */
-void pcsInit(uint8_t nb_bits, uint8_t trailing_bits) {
+void pcsInit(uint8_t nb_bits, uint8_t trailing_bits, uint32_t flavor_init) {
 
     search_space = 1 << nb_bits;
     trailing_space = 1 << trailing_bits;
+    flavor = flavor_init;
 }
 
 /** Run the PCS algorithm.
  *
  */
-void pcsRun(Table_t *table, uint32_t flavor_init, uint32_t nb_collisions,
+void pcsRun(Table_t *table, uint32_t  start, uint32_t nb_collisions,
             pcg32_random_t* rngptr, uint32_t *collisions) {
 
-    uint32_t start1, collision;
+    uint32_t collision;
+
     uint32_t i = 0;
 
     Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
-    flavor = flavor_init;
-
     while(i < nb_collisions) {
-        //Initialize a starting point
-        start1 = pcg32_boundedrand_r(rngptr, search_space);
 
-        getDistinguished(start1, rngptr, tuple1);
+        getDistinguished(start, rngptr, tuple1);
 
         if (structAdd(table, tuple1, tuple2)) {
             collision = findCollision(tuple1, tuple2);
             if (collision) {
                 collisions[i] = collision;
                 i++;
-                //printf("collision found!, %u \n", collision);
+                // printf("collision found!, %u \n", collision);
             }
         }
+        // get next starting point
+        // start = pcg32_boundedrand_r(rngptr, search_space);
+        start = hashInt(start) % search_space;
+
     }
     free(tuple1);
     free(tuple2);

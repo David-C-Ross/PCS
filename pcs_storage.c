@@ -4,9 +4,9 @@
 /** Initialize the distinguished-point-storing structure.
  * 
  */
-Table_t *structInit(uint8_t memory)
+Table_t *structInit(uint8_t memory, uint8_t is_dynamic)
 {
-    return structInitHash(memory);
+    return structInitHash(memory, is_dynamic);
 }
 
 /** Search and insert.

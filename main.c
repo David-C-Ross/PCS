@@ -10,40 +10,53 @@
 
 int main() {
     // the needle will appear 2^5=32 times, hash has been checked to not contain any other needles of similar magnitude.
-    uint8_t n = 23, memory = 6, prob = 18;
+    uint8_t n = 24, memory = 8, prob = 18;
 
     //pcsPcsModeDetection(n, memory, prob);
-    //pcsRhoModeDetection(n, memory, prob);
-    //pcsModeDetection(n, memory, prob);
-/*
-    pcg32_random_t rng1;
-    pcg32_srandom_r(&rng1, arc4random(), arc4random());
+    //rhoModeDetection(n, memory);
+    //rhoPcsModeDetection(n, memory, prob);
 
-    Table_t *table;
-    table = structInit(memory);
+    /*
+    pcg32_random_t rng;
+    pcg32_srandom_r(&rng, arc4random(), arc4random());
 
-    uint32_t flavor_init = 0, nb_collisions = 10000;
-    uint32_t *collisions = malloc(sizeof(uint32_t) * nb_collisions);
+    uint32_t start, search_space = 1 << n;
+    uint32_t coll1, coll2;
 
-    pcsInit(n, 8);
-    initF(n, prob);
-    pcsRun(table, flavor_init, nb_collisions, &rng1, collisions);
+    start = pcg32_boundedrand_r(&rng, search_space);
 
-    for (int i = 0; i < nb_collisions; ++i) {
-        printf("%u \n", collisions[i]);
+    Table_t *table = structInit(memory, 0);
+
+    Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
+    Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
+
+    pcsInit(n, 6, 0);
+    initF(n, prob, 1);
+
+    while (table->memory_alloc < (1 << memory)) {
+        getDistinguished(start, &rng, tuple1);
+        structAdd(table, tuple1, tuple2);
+        start = pcg32_boundedrand_r(&rng, search_space);
     }
 
-    free(collisions);
-    structFree(table);
+    pcsRun(table, start, 1, &rng, &coll1);
+    pcsRun(table, start, 1, &rng, &coll2);
 
- */
+    printf("%u \n", coll1);
+    printf("%u \n", coll2);
+
+    free(tuple1);
+    free(tuple2);
+
+    structFree(table);
+*/
     FILE *fptr1;
     FILE *fptr2;
     FILE *fptr3;
 
-    fptr1 = fopen("benchmarksPCS16.txt","a");
-    fptr2 = fopen("benchmarksRho16.txt","a");
-    fptr3 = fopen("benchmarks16.txt","a");
+    fptr1 = fopen("benchmarks1.txt","a");
+    fptr2 = fopen("benchmarks2.txt","a");
+    fptr3 = fopen("benchmarks3.txt","a");
 
     if(fptr1 == NULL || fptr2 == NULL || fptr3 == NULL) {
         printf("Error!");
@@ -51,47 +64,49 @@ int main() {
     }
 
     clock_t start_time;
-    double elapsed_time, average_pcs = 0, average_rho = 0, average = 0;
-    uint8_t flag, nb_tests = 100;
+    double elapsed_time, average_1 = 0, average_2 = 0, average_3 = 0;
+    uint8_t flag;
+    uint32_t nb_tests = 100;
 
-    for (uint8_t i = 0; i < nb_tests; ++i) {
+    for (uint32_t i = 0; i < nb_tests; ++i) {
 
         printf("Test : %u \n", i);
 
         start_time = clock();
 
-        flag = pcsPcsModeDetection(n, memory, prob);
+        flag = rhoPcsModeDetection(n, 5, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-        average_pcs += elapsed_time;
-        printf("PCS (nested) done in %f seconds\n", elapsed_time);
+        average_1 += elapsed_time;
+        printf("done in %f seconds\n", elapsed_time);
         fprintf(fptr1,"%f : %u \n",elapsed_time, flag);
         fflush(fptr1);
 
         start_time = clock();
 
-        flag = pcsRhoModeDetection(n, memory, prob);
+        flag = rhoModeDetection(n, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-        average_rho += elapsed_time;
-        printf("Rho (nested) done in %f seconds\n", elapsed_time);
+        average_2 += elapsed_time;
+        printf("done in %f seconds\n", elapsed_time);
         fprintf(fptr2,"%f : %u \n",elapsed_time, flag);
         fflush(fptr2);
 
         start_time = clock();
 
-        flag = pcsModeDetection(n, memory, prob);
+        flag = rhoModeDetection(n, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-        average += elapsed_time;
-        printf("PCS done in %f seconds\n", elapsed_time);
+        average_3 += elapsed_time;
+        printf("done in %f seconds\n", elapsed_time);
         fprintf(fptr3,"%f : %u \n",elapsed_time, flag);
         fflush(fptr3);
+
     }
 
-    printf("average time PCS (nested): %f \n", average_pcs / nb_tests);
-    printf("average time RHO (nested): %f \n", average_rho / nb_tests);
-    printf("average time PCS : %f \n", average / nb_tests);
+    printf("average time: %f \n", average_1 / nb_tests);
+    printf("average time: %f \n", average_2 / nb_tests);
+    printf("average time: %f \n", average_3 / nb_tests);
 
     fclose(fptr1);
     fclose(fptr2);

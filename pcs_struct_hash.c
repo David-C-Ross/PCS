@@ -8,7 +8,7 @@ static uint32_t table_size;
 /** Initialize the hash table and allocate memory.
  *
  */
-Table_t *structInitHash(uint8_t memory) {
+Table_t *structInitHash(uint8_t memory, uint8_t is_dynamic) {
 
     uint32_t i;
     table_size = 1 << memory;
@@ -25,13 +25,14 @@ Table_t *structInitHash(uint8_t memory) {
     table->array = array;
     //Memory limiting feature is turned on
     table->memory_alloc = 0;
+    table->is_dynamic = is_dynamic;
 
     return table;
 }
 
 uint8_t structAddHash(Table_t *table, Tuple_t *tuple1, Tuple_t *tuple2) {
 
-    uint32_t i, found = 0;
+    uint32_t i;
     Tuple_t *new, *next;
 
     for (i = 0; i < table_size; ++i) {
@@ -42,9 +43,10 @@ uint8_t structAddHash(Table_t *table, Tuple_t *tuple1, Tuple_t *tuple2) {
             tuple2->start = next->start;
             tuple2->length = next->length;
 
-            next->start = tuple1->start;
-            next->length = tuple1->length;
-
+            if (table->is_dynamic) {
+                next->start = tuple1->start;
+                next->length = tuple1->length;
+            }
             return 1;
         }
     }
@@ -56,7 +58,8 @@ uint8_t structAddHash(Table_t *table, Tuple_t *tuple1, Tuple_t *tuple2) {
 
     if (table->memory_alloc < table_size) {
         table->array[table->memory_alloc] = new;
-    } else {
+    }
+    else if (table->is_dynamic) {
         i = table->memory_alloc % table_size;
         free(table->array[i]);
         table->array[i] = new;
