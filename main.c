@@ -10,11 +10,11 @@
 
 int main() {
     // the needle will appear 2^5=32 times, hash has been checked to not contain any other needles of similar magnitude.
-    uint8_t n = 24, memory = 8, prob = 18;
+    uint8_t n = 25, memory = 6, prob = 20;
 
-    //pcsPcsModeDetection(n, memory, prob);
-    //rhoModeDetection(n, memory);
-    //rhoPcsModeDetection(n, memory, prob);
+    // pcsPcsModeDetection(n, memory, prob);
+    // rhoModeDetection(n, memory);
+    // rhoPcsModeDetection(n, memory, prob);
 
     /*
     pcg32_random_t rng;
@@ -66,7 +66,7 @@ int main() {
     clock_t start_time;
     double elapsed_time, average_1 = 0, average_2 = 0, average_3 = 0;
     uint8_t flag;
-    uint32_t nb_tests = 100;
+    uint32_t nb_tests = 50;
 
     for (uint32_t i = 0; i < nb_tests; ++i) {
 
@@ -74,7 +74,7 @@ int main() {
 
         start_time = clock();
 
-        flag = rhoPcsModeDetection(n, 5, prob);
+        flag = pcsRhoModeDetection(n, 5, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_1 += elapsed_time;
@@ -84,7 +84,7 @@ int main() {
 
         start_time = clock();
 
-        flag = rhoModeDetection(n, prob);
+        flag = pcsRhoModeDetection(n, 10, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_2 += elapsed_time;
@@ -94,7 +94,7 @@ int main() {
 
         start_time = clock();
 
-        flag = rhoModeDetection(n, prob);
+        flag = rhoPcsModeDetection(n, 10, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_3 += elapsed_time;

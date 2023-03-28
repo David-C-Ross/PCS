@@ -36,8 +36,8 @@ void getDistinguished(uint32_t start, pcg32_random_t* rngptr, Tuple_t *tuple) {
         trail_length++;
 
         if (trail_length > trail_length_max) {
-            // start = pcg32_boundedrand_r(rngptr, search_space);
-            start = hashInt(start) % search_space;
+            start = pcg32_boundedrand_r(rngptr, search_space);
+            // start = hashInt(start) % search_space;
 
             x = start;
             trail_length = 0;
@@ -106,9 +106,9 @@ void pcsInit(uint8_t nb_bits, uint8_t trailing_bits, uint32_t flavor_init) {
 void pcsRun(Table_t *table, uint32_t  start, uint32_t nb_collisions,
             pcg32_random_t* rngptr, uint32_t *collisions) {
 
-    uint32_t collision;
+    uint32_t collision, i = 0;
 
-    uint32_t i = 0;
+    pcg32_srandom_r(rngptr, start, flavor);
 
     Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
@@ -126,8 +126,8 @@ void pcsRun(Table_t *table, uint32_t  start, uint32_t nb_collisions,
             }
         }
         // get next starting point
-        // start = pcg32_boundedrand_r(rngptr, search_space);
-        start = hashInt(start) % search_space;
+        start = pcg32_boundedrand_r(rngptr, search_space);
+        // start = hashInt(start) % search_space;
 
     }
     free(tuple1);

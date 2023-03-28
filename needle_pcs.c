@@ -362,7 +362,7 @@ uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
     initF(nb_bits, prob_init);
 
     do {
-        outer_table = structInit(memory, 1);
+        outer_table = structInit(memory, 0);
 
         pcg32_srandom_r(&rng, arc4random(), arc4random());
 
@@ -374,8 +374,14 @@ uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
         structFree(outer_table);
 
-        flag = isNeedleMem(collisions, prob, nb_collisions);
-        if (flag) goto found_needle;
+        // flag = isNeedleMem(collisions, prob, nb_collisions);
+        // if (flag) goto found_needle;
+        for (int i = 0; i < nb_collisions; ++i) {
+            if (collisions[i] == 1) {
+                printf("%u is the needle!", collisions[i]);
+                goto found_needle;
+            }
+        }
     } while (1);
 
     found_needle:
