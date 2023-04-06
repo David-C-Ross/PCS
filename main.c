@@ -10,11 +10,11 @@
 
 int main() {
     // the needle will appear 2^5=32 times, hash has been checked to not contain any other needles of similar magnitude.
-    uint8_t n = 25, memory = 6, prob = 20;
+    uint8_t n = 28, memory = 6, prob = 22;
 
-    // pcsPcsModeDetection(n, memory, prob);
-    // rhoModeDetection(n, memory);
-    // rhoPcsModeDetection(n, memory, prob);
+    // pcsRhoModeDetection(n, memory, inverse_prob);
+    // rhoModeDetection(n, inverse_prob);
+    // rhoPcsModeDetection(n, memory, inverse_prob);
 
     /*
     pcg32_random_t rng;
@@ -31,7 +31,7 @@ int main() {
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
     pcsInit(n, 6, 0);
-    initF(n, prob, 1);
+    initF(n, inverse_prob, 1);
 
     while (table->memory_alloc < (1 << memory)) {
         getDistinguished(start, &rng, tuple1);
@@ -73,8 +73,8 @@ int main() {
         printf("Test : %u \n", i);
 
         start_time = clock();
-
-        flag = pcsRhoModeDetection(n, 5, prob);
+        /*
+        flag = pcsRhoModeDetection(n, 6, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_1 += elapsed_time;
@@ -84,17 +84,17 @@ int main() {
 
         start_time = clock();
 
-        flag = pcsRhoModeDetection(n, 10, prob);
+        flag = rhoPcsModeDetection(n, 6, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_2 += elapsed_time;
         printf("done in %f seconds\n", elapsed_time);
         fprintf(fptr2,"%f : %u \n",elapsed_time, flag);
         fflush(fptr2);
-
+        */
         start_time = clock();
 
-        flag = rhoPcsModeDetection(n, 10, prob);
+        flag = rhoPcsModeDetection(n, 8, prob);
 
         elapsed_time = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         average_3 += elapsed_time;

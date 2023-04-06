@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 99)
 
 add_executable(PCS main.c pcs_struct_hash.c pcs_struct_hash.h pcs_storage.h
         pcs_storage.c pcs.h pcs.c random_functions.h random_functions.c
-        needle_pcs.c needle_pcs.h needle_rho.c needle_rho.h pcg_basic.c pcg_basic.h collision_storage.c collision_storage.h)
+        needle_pcs.c needle_pcs.h needle_rho.c needle_rho.h pcg_basic.c pcg_basic.h)
 
 link_directories("/opt/homebrew/lib")
 include_directories("/opt/homebrew/include")

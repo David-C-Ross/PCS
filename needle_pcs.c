@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <time.h>
 #include "pcs.h"
 #include "pcs_storage.h"
 #include "needle_pcs.h"
@@ -8,7 +9,7 @@
 #include "random_functions.h"
 
 static uint32_t search_space;
-static uint32_t prob;
+static uint32_t inverse_prob;
 
 static uint32_t inner_flavor;
 static uint32_t outer_flavor;
@@ -22,7 +23,7 @@ static uint8_t trailing_bits;
  *  @param[in]	nb_collisions	number of possible needles to check.
  *  @return 	1 if one of the points is the needle, 0 otherwise.
  **/
-int isNeedleMem(uint32_t *collisions, uint32_t inverse_prob, uint32_t nb_collisions) {
+int isNeedleMem(uint32_t *collisions, uint32_t nb_collisions) {
 
     uint8_t retval = 0;
     uint8_t *counters = calloc(nb_collisions, sizeof(uint8_t));
@@ -30,7 +31,7 @@ int isNeedleMem(uint32_t *collisions, uint32_t inverse_prob, uint32_t nb_collisi
     uint32_t x;
 
     pcg32_random_t rng;
-    pcg32_srandom_r(&rng, arc4random(), arc4random());
+    pcg32_srandom_r(&rng, random(), random());
 
     inner_flavor = pcg32_boundedrand_r(&rng, search_space);
 
@@ -76,7 +77,7 @@ uint32_t collisionPcs(Tuple_t *tuple1, Tuple_t *tuple2, uint8_t memory) {
     Table_t *inner_table2 = structInit(memory, 0);
 
     pcg32_random_t int_rng;
-    pcg32_srandom_r(&int_rng, arc4random(), arc4random());
+    pcg32_srandom_r(&int_rng, random(), random());
 
     while (len1 > len2) {
         pcsRun(inner_table1, x1, 1, &int_rng, &x1);
@@ -160,7 +161,7 @@ uint32_t collisionRho(Tuple_t *tuple1, Tuple_t *tuple2) {
 uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
     search_space = 1 << nb_bits;
-    prob = 1 << prob_init;
+    inverse_prob = 1 << prob_init;
 
     trailing_bits = trailingBitsInit(nb_bits, memory);
 
@@ -178,8 +179,10 @@ uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
     Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
+    srandom(time(NULL));
+
     pcg32_random_t ext_rng;
-    pcg32_srandom_r(&ext_rng, arc4random(), arc4random());
+    pcg32_srandom_r(&ext_rng, random(), random());
 
     pcg32_random_t int_rng;
 
@@ -192,7 +195,7 @@ uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
         // create random outer_flavor
         outer_flavor = pcg32_boundedrand_r(&ext_rng, search_space);
 
-        pcg32_srandom_r(&int_rng, arc4random(), arc4random());
+        pcg32_srandom_r(&int_rng, random(), random());
 
         pcsInit(nb_bits, trailing_bits, outer_flavor);
         // find O(M) collisions which are also distinguished points
@@ -237,7 +240,7 @@ uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
             }
         }
         structFree(outer_table);
-        flag = isNeedleMem(collisions, prob, counter);
+        flag = isNeedleMem(collisions, counter);
         if (flag) goto found_needle;
 
         //printf("________________________________ \n");
@@ -255,7 +258,7 @@ uint8_t pcsPcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
 uint8_t pcsRhoModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
     search_space = 1 << nb_bits;
-    prob = 1 << prob_init;
+    inverse_prob = 1 << prob_init;
 
     trailing_bits = trailingBitsInit(nb_bits, memory);
 
@@ -272,10 +275,13 @@ uint8_t pcsRhoModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
     Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
+    srandom(time(NULL));
+
     pcg32_random_t ext_rng;
-    pcg32_srandom_r(&ext_rng, arc4random(), arc4random());
+    pcg32_srandom_r(&ext_rng, random(), random());
 
     initF(nb_bits, prob_init);
+    initRho(nb_bits, prob_init);
     pcsInit(nb_bits, trailing_bits, 0);
 
     do {
@@ -322,7 +328,7 @@ uint8_t pcsRhoModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
             }
         }
         structFree(outer_table);
-        // flag = isNeedleMem(collisions, prob, counter);
+        // flag = isNeedleMem(collisions, counter);
         // if (flag) goto found_needle;
         for (int i = 0; i < counter; ++i) {
             if (collisions[i] == 1) {
@@ -346,7 +352,7 @@ uint8_t pcsRhoModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) 
 uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
     search_space = 1 << nb_bits;
-    prob = 1 << prob_init;
+    inverse_prob = 1 << prob_init;
 
     trailing_bits = trailingBitsInit(nb_bits, memory);
 
@@ -354,6 +360,8 @@ uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
     uint32_t *collisions = malloc(sizeof(uint32_t) * nb_collisions);
 
     uint8_t flag;
+
+    srandom(time(NULL));
 
     pcg32_random_t rng;
 
@@ -364,7 +372,7 @@ uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
     do {
         outer_table = structInit(memory, 0);
 
-        pcg32_srandom_r(&rng, arc4random(), arc4random());
+        pcg32_srandom_r(&rng, random(), random());
 
         start = pcg32_boundedrand_r(&rng, search_space);
         outer_flavor = pcg32_boundedrand_r(&rng, search_space);
@@ -374,7 +382,7 @@ uint8_t pcsModeDetection(uint8_t nb_bits, uint8_t memory, uint8_t prob_init) {
 
         structFree(outer_table);
 
-        // flag = isNeedleMem(collisions, prob, nb_collisions);
+        // flag = isNeedleMem(collisions, nb_collisions);
         // if (flag) goto found_needle;
         for (int i = 0; i < nb_collisions; ++i) {
             if (collisions[i] == 1) {
