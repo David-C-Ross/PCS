@@ -1,12 +1,9 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include "pcs.h"
-#include "pcs_storage.h"
+#include "pcs_struct_hash.h"
 #include "random_functions.h"
 
-static uint32_t search_space;
-static uint32_t trailing_space;
+extern uint32_t search_space;
 static uint32_t flavor;
 
 /** Determines whether a point is a distinguished one.
@@ -15,8 +12,9 @@ static uint32_t flavor;
  *  @param[in]	trailing_bits  Number of trailing zero bits.
  *  @return 	1 if the point is distinguished, 0 otherwise.
  */
-uint8_t isDistinguished(uint32_t point) {
+uint8_t isDistinguished(uint32_t point, uint8_t trailing_bits) {
 
+    uint32_t trailing_space = 1 << trailing_bits;
     if (point % trailing_space == 0) {
         return 1;
     }
@@ -25,13 +23,13 @@ uint8_t isDistinguished(uint32_t point) {
     }
 }
 
-void getDistinguished(uint32_t start, pcg32_random_t* rngptr, Tuple_t *tuple) {
+void getDistinguished(uint32_t start, uint8_t trailing_bits, pcg32_random_t* rngptr, Tuple_t *tuple) {
 
     uint32_t x = start;
     uint32_t trail_length = 0;
-    uint32_t trail_length_max = trailing_space * 20;
+    uint32_t trail_length_max = (1 << trailing_bits) * 20;
 
-    while (!isDistinguished(x)) {
+    while (!isDistinguished(x, trailing_bits)) {
         x = f(x, flavor);
         trail_length++;
 
@@ -93,31 +91,27 @@ uint32_t findCollision(Tuple_t *tuple1, Tuple_t *tuple2) {
 /** Initialize all variables needed to do a PCS algorithm.
  *
  */
-void pcsInit(uint8_t nb_bits, uint8_t trailing_bits, uint32_t flavor_init) {
+void pcsInitFlavor(uint32_t flavor_init) {
 
-    search_space = 1 << nb_bits;
-    trailing_space = 1 << trailing_bits;
     flavor = flavor_init;
 }
 
 /** Run the PCS algorithm.
  *
  */
-void pcsRun(Table_t *table, uint32_t  start, uint32_t nb_collisions,
+void pcsRun(Table_t *table, uint32_t  start, uint32_t nb_collisions, uint8_t trailing_bits,
             pcg32_random_t* rngptr, uint32_t *collisions) {
 
     uint32_t collision, i = 0;
-
-    pcg32_srandom_r(rngptr, start, flavor);
 
     Tuple_t *tuple1 = malloc(sizeof(Tuple_t));
     Tuple_t *tuple2 = malloc(sizeof(Tuple_t));
 
     while(i < nb_collisions) {
 
-        getDistinguished(start, rngptr, tuple1);
+        getDistinguished(start, trailing_bits, rngptr, tuple1);
 
-        if (structAdd(table, tuple1, tuple2)) {
+        if (structAddHash(table, tuple1, tuple2)) {
             collision = findCollision(tuple1, tuple2);
             if (collision) {
                 collisions[i] = collision;
